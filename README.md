@@ -60,4 +60,4 @@ When the VM boots, cloud-init will:
 ## Access the VM
 
 - SSH: `ssh -p 2222 <username>@localhost`. Initial user defaults to `user` unless you override it.
-- HTTP: open `http://localhost:8080` in your browser to see the landing page.
+- HTTP: open `http://localhost:8080` in your browser to see the landing page or use command `curl http://localhost:8080`.
