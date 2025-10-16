@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: make-vm.sh <name> <ram_mb> <vcpus> <ssh_pubkey_path> [site_content] [username] [password]
-NAME="${1:-debian-vm}"
-RAM="${2:-2048}"
-VCPUS="${3:-2}"
-PUBKEY_PATH="${4:-$HOME/.ssh/id_rsa.pub}"
-SITE_CONTENT="${5:-It works!}"
-USERNAME="${6:-user}"
-PASSWORD="${7:-password}"
+# Default configuration values
+NAME="debian-vm"
+RAM="2048"
+VCPUS="2"
+PUBKEY_PATH="$HOME/.ssh/id_rsa.pub"
+SITE_CONTENT="It works!"
+USERNAME="user"
+PASSWORD="password"
 
 # Directories and file paths
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -20,6 +20,116 @@ VM_IMG="$VM_DIR/${NAME}.qcow2"
 SEED_ISO="$VM_DIR/cloud-data.iso"
 USER_DATA="$VM_DIR/user-data"
 META_DATA="$VM_DIR/meta-data"
+
+usage() {
+  cat <<'EOF'
+Usage: make-vm.sh [options]
+
+Options:
+  -n, --name <name>                VM name (default: debian-vm)
+  -r, --ram <ram_mb>               RAM in megabytes (default: 2048)
+  -c, --vcpus <count>              Number of virtual CPUs (default: 2)
+  -k, --ssh-pubkey-path <path>     Path to SSH public key (default: $HOME/.ssh/id_rsa.pub)
+  -s, --site-content <text>        Landing page content (default: "It works!")
+  -u, --username <name>            Cloud-init username (default: user)
+  -p, --password <value>           Cloud-init password (default: password)
+  -h, --help                       Show this help message and exit
+EOF
+}
+
+parse_long_opt_with_value() {
+  local opt="$1"
+  local var_ref="$2"
+  local value
+  value="${opt#*=}"
+  if [[ -z "$value" ]]; then
+    echo "Option ${opt%%=*} requires a value." >&2
+    usage >&2
+    exit 1
+  fi
+  printf -v "$var_ref" '%s' "$value"
+}
+
+get_opt_value() {
+  local option="$1"
+  local next_value="$2"
+  if [[ -z "$next_value" || "$next_value" == -* ]]; then
+    echo "Option $option requires a value." >&2
+    usage >&2
+    exit 1
+  fi
+  printf '%s' "$next_value"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--name)
+      NAME="$(get_opt_value "$1" "${2-}")"
+      shift 2
+      ;;
+    --name=*)
+      parse_long_opt_with_value "$1" NAME
+      shift
+      ;;
+    -r|--ram)
+      RAM="$(get_opt_value "$1" "${2-}")"
+      shift 2
+      ;;
+    --ram=*)
+      parse_long_opt_with_value "$1" RAM
+      shift
+      ;;
+    -c|--vcpus)
+      VCPUS="$(get_opt_value "$1" "${2-}")"
+      shift 2
+      ;;
+    --vcpus=*)
+      parse_long_opt_with_value "$1" VCPUS
+      shift
+      ;;
+    -k|--ssh-pubkey-path)
+      PUBKEY_PATH="$(get_opt_value "$1" "${2-}")"
+      shift 2
+      ;;
+    --ssh-pubkey-path=*)
+      parse_long_opt_with_value "$1" PUBKEY_PATH
+      shift
+      ;;
+    -s|--site-content)
+      SITE_CONTENT="$(get_opt_value "$1" "${2-}")"
+      shift 2
+      ;;
+    --site-content=*)
+      parse_long_opt_with_value "$1" SITE_CONTENT
+      shift
+      ;;
+    -u|--username)
+      USERNAME="$(get_opt_value "$1" "${2-}")"
+      shift 2
+      ;;
+    --username=*)
+      parse_long_opt_with_value "$1" USERNAME
+      shift
+      ;;
+    -p|--password)
+      PASSWORD="$(get_opt_value "$1" "${2-}")"
+      shift 2
+      ;;
+    --password=*)
+      parse_long_opt_with_value "$1" PASSWORD
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
 
 # Create necessary directories
 mkdir -p "$IMG_DIR" "$VM_DIR"
@@ -62,6 +172,6 @@ exec qemu-system-x86_64 \
   -m "$RAM" -smp "$VCPUS" \
   -drive file="$VM_IMG",if=virtio \
   -cdrom "$SEED_ISO" \
-  -nic user,model=virtio,hostfwd=tcp:127.0.0.1:2222-:22,hostfwd=tcp:127.0.0.1:8080-:80 \
+  -nic user,model=virtio,hostfwd=tcp::2222-:22,hostfwd=tcp::8080-:80 \
   -display none \
   -serial mon:stdio

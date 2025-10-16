@@ -30,7 +30,25 @@ You can install them via the helper script:
 Usage:
 
 ```bash
-./scripts/make-vm.sh <name> <ram_mb> <vcpus> <ssh_pubkey_path> [site_content] [username] [password]
+./scripts/make-vm.sh \
+  --name <name> \
+  --ram <ram_mb> \
+  --vcpus <count> \
+  --ssh-pubkey-path <path> \
+  --site-content <text> \
+  --username <name> \
+  --password <value>
+
+# All options are optional: specify only what you need; the rest use defaults
+# Short flags are supported: -n, -r, -c, -k, -s, -u, -p
+```
+
+Examples:
+
+```bash
+./scripts/make-vm.sh --name demo --ram 4096 --vcpus 4
+./scripts/make-vm.sh -n demo -r 4096 -c 4 -k ~/.ssh/id_ed25519.pub -u alice -p secret
+./scripts/make-vm.sh --help
 ```
 
 Quick start (uses defaults):
@@ -61,3 +79,40 @@ When the VM boots, cloud-init will:
 
 - SSH: `ssh -p 2222 <username>@localhost`. Initial user defaults to `user` unless you override it.
 - HTTP: open `http://localhost:8080` in your browser to see the landing page or use command `curl http://localhost:8080`.
+
+## Access through Windows
+
+To access the VM from Windows (outside WSL2), forward ports from Windows to WSL2 using `netsh portproxy`.
+
+Get the WSL2 IPv4 address (in the Linux terminal inside WSL2):
+
+```bash
+ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'
+```
+
+Copy the address, for example: `172.29.40.10`.
+
+In an elevated PowerShell on Windows, add rules for ports 2222 (SSH) and 8080 (HTTP):
+
+```powershell
+$WslIp = "<WSL2_IPv4>"
+netsh interface portproxy add v4tov4 listenport=2222 listenaddress=0.0.0.0 connectaddress=$WslIp connectport=2222
+netsh interface portproxy add v4tov4 listenport=8080 listenaddress=0.0.0.0 connectaddress=$WslIp connectport=8080
+```
+
+Show active rules:
+
+```powershell
+netsh interface portproxy show all
+```
+
+Remove a rule (example for 8080):
+
+```powershell
+netsh interface portproxy delete v4tov4 listenport=8080 listenaddress=0.0.0.0
+```
+
+After that, access from Windows:
+
+- SSH: `ssh -p 2222 user@127.0.0.1`
+- HTTP: `http://127.0.0.1:8080`
